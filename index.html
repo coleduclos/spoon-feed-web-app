@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Spoon Feed</title>
+        <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+        <meta charset="utf-8">
+        <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+        <script src="./javascript/jsbn.js"></script>
+        <script src="./javascript/jsbn2.js"></script>
+        <script src="./javascript/sjcl.js"></script>
+        <script src="./javascript/aws-cognito-sdk.min.js"></script>
+        <script src="./javascript/amazon-cognito-identity.min.js"></script>
+        <script src="https://sdk.amazonaws.com/js/aws-sdk-2.6.10.min.js"></script>
+        <script src="./javascript/user-service.js"></script>
+        
+        <style>
+            #map {
+                height: 80%;
+            }
+            #item_scroll_bar {
+                height: 20%;
+                white-space: nowrap;
+                overflow-x: scroll;
+                overflow-y: hidden;
+            }
+            .scroll_card {
+                height: 100%;
+                width: 150px;
+                margin: 10px;
+                padding: 10px;
+                display: inline-block;
+                white-space: normal;
+                vertical-align: text-top;
+            }
+            html, body {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+        </style>
+        <script>
+
+            var map;
+            var infowindow;
+            var service;
+            var current_item;
+            var user_attributes = {};
+            var dislike_value = 0;
+            var like_value = 1;
+            var cognito_user = userPool.getCurrentUser();
+            var session_id_token;
+
+            if (cognito_user != null) {
+                cognito_user.getSession(function(err, session) {
+                    if (err) {
+                       alert(err);
+                        return;
+                    }
+                    
+                    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+                        IdentityPoolId : '...', // your identity pool id here
+                        Logins : {
+                            // Change the key below according to the specific region your user pool is in.
+                            cognito_login_key : session.getIdToken().getJwtToken()
+                        }
+                    });
+
+                    session_id_token = session.getIdToken().getJwtToken()
+
+                    cognito_user.getUserAttributes(function(err, result) {
+                        if (err) {
+                            alert(err);
+                            return;
+                        }
+                        for (i = 0; i < result.length; i++) 
+                        {
+                            user_attributes[result[i].getName()] = user_id = result[i].getValue()
+                        }
+                        console.log(user_attributes)
+                        getRecommendations()
+                    });
+
+                    $( function() {
+
+                        $( '#item_scroll_bar' ).on('click', 'div.scroll_card', function() {
+                            var request = {
+                                placeId: $(this).attr('id')
+                            };
+                            service.getDetails(request, getDetailsCallback);
+                        });
+
+                        $('.rate_button').click(function(){
+                            var rating_value;
+                            var button_id = $(this).attr('id');
+                            if (button_id == 'like_button')
+                                rating_value = like_value
+                            else if (button_id == 'dislike_button')
+                                rating_value = dislike_value
+                            rateItem(rating_value)
+                        });
+
+
+
+                    });
+
+                });
+            }
+
+            function getRecommendations()
+            {
+                var jqxhr = $.ajax( 
+                { 
+                    url: 'https://i5jasr6flc.execute-api.us-west-2.amazonaws.com/prod/duclos-app-restaurant/recommendations/' + user_attributes['sub'],
+                    method: 'GET',
+                    crossDomain: true,
+                    headers: {
+                        'Authorization' : session_id_token
+                    },
+                    dataType: 'json',
+                })
+                .done(function(response) {
+                    console.log("Get Recommendations: SUCCESS")
+                    console.log(response[0]['recommendation-map'])
+                })
+                .fail(function(xhr) {
+                    console.log(xhr)
+                    alert( "ERROR: " + xhr );
+                });
+            }
+
+            function getDetailsCallback(item)
+            {
+                current_item = item
+                $('#item_modal .modal-content #item_name').text(item.name)
+                $('#item_modal .modal-content #item_address').text(item.formatted_address)
+                $('#item_modal .modal-content #item_phone_number').text(item.formatted_phone_number)
+                $('#item_modal .modal-content #item_rating').text(item.rating)
+                $('#item_modal').modal('show')
+            }
+
+            function rateItem(rating_value)
+            {
+                console.log(current_item)
+                console.log('Rating item: ' + rating_value)
+                
+                var jqxhr = $.ajax( 
+                    { 
+                        url: "https://i5jasr6flc.execute-api.us-west-2.amazonaws.com/prod/duclos-app-rating",
+                        method: 'POST',
+                        crossDomain: true,
+                        data: JSON.stringify({ 
+                            'user-id': user_attributes['sub'], 
+                            'rating-value' : rating_value,
+                            'restaurant' : {
+                                'restaurant-id' : current_item.place_id,
+                                'restaurant-name' : current_item.name,
+                                'restaurant-location': {
+                                    'lat' : current_item.geometry.location.lat(),
+                                    'lng' : current_item.geometry.location.lng()
+                                }
+                            }
+                        }),
+                        headers: {
+                            'Authorization' : session_id_token
+                        },
+                        dataType: 'json',
+                    })
+                    .done(function() {
+                        alert( "SUCCESS!" );
+                    })
+                    .fail(function(xhr) {
+                        alert( "ERROR: " + xhr );
+                    });
+                
+            }
+
+            function initPage() {
+                var pos = {lat: -33.867, lng: 151.195};
+                // Try HTML5 geolocation
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            pos = {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude
+                            };
+                            initMap(pos);
+
+                        }, 
+                        function() {
+                            handleLocationError(true);
+                        }
+                    );
+                } 
+                else {
+                    // Browser doesn't support Geolocation
+                    initMap(pos)
+                    handleLocationError(false);
+                }
+            }
+
+            function initMap(pos) 
+            {
+
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: pos,
+                    zoom: 15
+                });
+
+                infowindow = new google.maps.InfoWindow();
+                service = new google.maps.places.PlacesService(map);
+                service.nearbySearch({
+                    location: pos,
+                    radius: 1000,
+                    type: ['restaurant']
+                }, initMapCallback);
+            }
+
+            function initMapCallback(results, status) 
+            {
+                if (status === google.maps.places.PlacesServiceStatus.OK) 
+                {
+                    for (var i = 0; i < results.length; i++) 
+                    {
+                        createMarker(results[i]);
+                        createItemCards(results[i]);
+                    }
+                }
+            }
+
+            function createMarker(place) 
+            {
+                var placeLoc = place.geometry.location;
+                var marker = new google.maps.Marker({
+                    map: map,
+                    position: place.geometry.location
+                });
+
+                google.maps.event.addListener(marker, 'click', function() {
+                    console.log(place)
+                    infowindow.setContent(place.name);
+                    infowindow.open(map, this);
+                });
+            }
+
+            function createItemCards(place)
+            {
+                item_div = '<div class="scroll_card card" id="' + place.place_id + '"><div class="card-block">' + 
+                    '<h5 class="card-title">' + place.name + '</h5>' +
+                    '<p class="card-text">' + place.rating + '</p>'
+                    '</div></div>'
+                $('#item_scroll_bar').append(item_div)
+            }
+
+            function handleLocationError(browserHasGeolocation) 
+            {
+                console.log('ERROR: Location service')
+            }
+        </script>
+    </head>
+    <body>
+        <div id="map"></div>
+        <div id="item_scroll_bar"></div>
+
+        <div id="item_modal" class="modal fade" role="dialog">
+            <div class="modal-dialog">
+                <!-- Modal content-->
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title" id="item_name">Name</h4>
+                    </div>
+                    <div class="modal-body">
+                        <p id="item_address">Address</p>
+                        <p id="item_phone_number">Phone Number</p>
+                        <p id="item_rating">Rating</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="dislike_button" type="button" class="btn btn-default rate_button" data-dismiss="modal">Meh...</button>
+                        <button id="like_button" type="button" class="btn btn-default rate_button" data-dismiss="modal">Delish!</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAs5D07wQNNTA5r1HPbcZJLPcRD2rGSOJg&libraries=places&callback=initPage" async defer></script>
+    </body>
+</html>
