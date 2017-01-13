@@ -52,57 +52,59 @@
             var cognito_user = userPool.getCurrentUser();
             var session_id_token;
 
-            if (cognito_user != null) {
-                cognito_user.getSession(function(err, session) {
-                    if (err) {
-                       alert(err);
-                        return;
-                    }
-                    
-                    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-                        IdentityPoolId : '...', // your identity pool id here
-                        Logins : {
-                            // Change the key below according to the specific region your user pool is in.
-                            cognito_login_key : session.getIdToken().getJwtToken()
-                        }
-                    });
-
-                    session_id_token = session.getIdToken().getJwtToken()
-
-                    cognito_user.getUserAttributes(function(err, result) {
+            function createSession(){
+                if (cognito_user != null) {
+                    cognito_user.getSession(function(err, session) {
                         if (err) {
-                            alert(err);
+                           alert(err);
                             return;
                         }
-                        for (i = 0; i < result.length; i++) 
-                        {
-                            user_attributes[result[i].getName()] = user_id = result[i].getValue()
-                        }
-                        console.log(user_attributes)
-                        getRecommendations()
-                    });
-
-                    $( function() {
-
-                        $( '#item_scroll_bar' ).on('click', 'div.scroll_card', function() {
-                            var request = {
-                                placeId: $(this).attr('id')
-                            };
-                            service.getDetails(request, getDetailsCallback);
+                        
+                        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+                            IdentityPoolId : '...', // your identity pool id here
+                            Logins : {
+                                // Change the key below according to the specific region your user pool is in.
+                                cognito_login_key : session.getIdToken().getJwtToken()
+                            }
                         });
 
-                        $('.rate_button').click(function(){
-                            var rating_value;
-                            var button_id = $(this).attr('id');
-                            if (button_id == 'like_button')
-                                rating_value = like_value
-                            else if (button_id == 'dislike_button')
-                                rating_value = dislike_value
-                            rateItem(rating_value)
-                        });
-                    });
+                        session_id_token = session.getIdToken().getJwtToken()
 
-                });
+                        cognito_user.getUserAttributes(function(err, result) {
+                            if (err) {
+                                alert(err);
+                                return;
+                            }
+                            for (i = 0; i < result.length; i++) 
+                            {
+                                user_attributes[result[i].getName()] = user_id = result[i].getValue()
+                            }
+                            console.log(user_attributes)
+                            getRecommendations()
+                        });
+
+                        $( function() {
+
+                            $( '#item_scroll_bar' ).on('click', 'div.scroll_card', function() {
+                                var request = {
+                                    placeId: $(this).attr('id')
+                                };
+                                service.getDetails(request, getDetailsCallback);
+                            });
+
+                            $('.rate_button').click(function(){
+                                var rating_value;
+                                var button_id = $(this).attr('id');
+                                if (button_id == 'like_button')
+                                    rating_value = like_value
+                                else if (button_id == 'dislike_button')
+                                    rating_value = dislike_value
+                                rateItem(rating_value)
+                            });
+                        });
+
+                    });
+                }
             }
 
             function getRecommendations()
@@ -121,7 +123,13 @@
                 })
                 .done(function(response) {
                     console.log("Get Recommendations: SUCCESS")
-                    console.log(response)
+                    if (typeof(Storage) !== "undefined") {
+                        localStorage.setItem("recommendations", JSON.stringify(response));
+                    } else {
+                        alert("Deepest apologies... Your web browser is not supported :(")
+                    }
+                    initPage()
+
                 })
                 .fail(function(xhr) {
                     console.log(xhr)
@@ -177,6 +185,7 @@
 
             function initPage() {
                 var pos = {lat: -33.867, lng: 151.195};
+
                 // Try HTML5 geolocation
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
@@ -221,10 +230,16 @@
             {
                 if (status === google.maps.places.PlacesServiceStatus.OK) 
                 {
+                    var recommendations = JSON.parse(localStorage.getItem("recommendations"));
+                    for (var i = 0; i < recommendations.length; i++)
+                    {
+                        console.log(recommendations[i])
+                    }
+
                     for (var i = 0; i < results.length; i++) 
                     {
                         createMarker(results[i]);
-                        createItemCards(results[i]);
+                        createItemCards(results[i], "google");
                     }
                 }
             }
@@ -244,7 +259,7 @@
                 });
             }
 
-            function createItemCards(place)
+            function createItemCards(place, type)
             {
                 item_div = '<div class="scroll_card card" id="' + place.place_id + '"><div class="card-block">' + 
                     '<h5 class="card-title">' + place.name + '</h5>' +
@@ -283,6 +298,6 @@
                 </div>
             </div>
         </div>
-        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAs5D07wQNNTA5r1HPbcZJLPcRD2rGSOJg&libraries=places&callback=initPage" async defer></script>
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAs5D07wQNNTA5r1HPbcZJLPcRD2rGSOJg&libraries=places&callback=createSession" async defer></script>
     </body>
 </html>
