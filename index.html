@@ -100,9 +100,6 @@
                                 rating_value = dislike_value
                             rateItem(rating_value)
                         });
-
-
-
                     });
 
                 });
@@ -110,9 +107,11 @@
 
             function getRecommendations()
             {
-                var jqxhr = $.ajax( 
+                var url = 'https://i5jasr6flc.execute-api.us-west-2.amazonaws.com/prod/duclos-app-restaurant/recommendations/' + user_attributes['sub']
+
+                var jqxhr = $.ajax(
                 { 
-                    url: 'https://i5jasr6flc.execute-api.us-west-2.amazonaws.com/prod/duclos-app-restaurant/recommendations/' + user_attributes['sub'],
+                    url: url,
                     method: 'GET',
                     crossDomain: true,
                     headers: {
@@ -122,7 +121,7 @@
                 })
                 .done(function(response) {
                     console.log("Get Recommendations: SUCCESS")
-                    console.log(response[0]['recommendation-map'])
+                    console.log(response)
                 })
                 .fail(function(xhr) {
                     console.log(xhr)
