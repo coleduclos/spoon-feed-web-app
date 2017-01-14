@@ -230,41 +230,66 @@
             {
                 if (status === google.maps.places.PlacesServiceStatus.OK) 
                 {
-                    var recommendations = JSON.parse(localStorage.getItem("recommendations"));
-                    for (var i = 0; i < recommendations.length; i++)
-                    {
-                        console.log(recommendations[i])
-                    }
+                    // Change the keys of the Google results to match Spoon Feed keys
+                    temp = JSON.stringify(results)
+                    results = JSON.parse(temp, function(k, v){
+                        if(k == "place_id")
+                            this["restaurant-id"] = v
+                        else if (k == "name")
+                            this["restaurant-name"] = v
+                        else if (k == "rating")
+                            this["google-rating"] = v
+                        else
+                            return v
+                    })
 
+                    var recommendations = JSON.parse(localStorage.getItem("recommendations"));
+
+                    // Combine recommendations with Google results. 
                     for (var i = 0; i < results.length; i++) 
                     {
-                        createMarker(results[i]);
-                        createItemCards(results[i], "google");
+                        restaurant = results[i]
+                        for (var j = 0; j < recommendations.length; j++)
+                        {
+                            if (restaurant["restaurant-id"] == recommendations[j]["restaurant-id"])
+                            {
+                                $.extend(restaurant, recommendations[j])
+                            }
+
+                        }
+                        createMarker(restaurant);
+                        createItemCards(restaurant);
                     }
                 }
             }
 
-            function createMarker(place) 
+            function createMarker(restaurant) 
             {
-                var placeLoc = place.geometry.location;
+                var restaurant_location = restaurant.geometry.location;
                 var marker = new google.maps.Marker({
                     map: map,
-                    position: place.geometry.location
+                    position: restaurant_location
                 });
 
                 google.maps.event.addListener(marker, 'click', function() {
-                    console.log(place)
-                    infowindow.setContent(place.name);
+                    console.log(restaurant)
+                    infowindow.setContent(restaurant["restaurant-name"]);
                     infowindow.open(map, this);
                 });
             }
 
-            function createItemCards(place, type)
+            function createItemCards(restaurant)
             {
-                item_div = '<div class="scroll_card card" id="' + place.place_id + '"><div class="card-block">' + 
-                    '<h5 class="card-title">' + place.name + '</h5>' +
-                    '<p class="card-text">' + place.rating + '</p>'
-                    '</div></div>'
+
+                item_div = '<div class="scroll_card card" id="' + restaurant["restaurant-id"] + '"><div class="card-block">' + 
+                    '<h5 class="card-title">' + restaurant["restaurant-name"] + '</h5>' +
+                    '<p class="card-text">' + restaurant["google-rating"] + '</p>'
+
+                if (restaurant["spoon-feed-value"])
+                    item_div +=   '<p class="card-text">SFV: ' + restaurant["google-rating"] + '</p>'
+                    
+                item_div += '</div></div>'
+                
                 $('#item_scroll_bar').append(item_div)
             }
 
