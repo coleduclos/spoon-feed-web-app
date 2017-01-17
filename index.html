@@ -109,32 +109,40 @@
 
             function getRecommendations()
             {
-                var url = 'https://i5jasr6flc.execute-api.us-west-2.amazonaws.com/prod/duclos-app-restaurant/recommendations/' + user_attributes['sub']
+                var recommendations_timeout = 60*60*1000;
+                var current_time = Date.now();
+                var last_recommendation_timestamp = localStorage.getItem("recommendations-timestamp")
+                if ( (current_time - last_recommendation_timestamp) > recommendations_timeout )
+                {
+                    var url = 'https://i5jasr6flc.execute-api.us-west-2.amazonaws.com/prod/duclos-app-restaurant/recommendations/' + user_attributes['sub']
 
-                var jqxhr = $.ajax(
-                { 
-                    url: url,
-                    method: 'GET',
-                    crossDomain: true,
-                    headers: {
-                        'Authorization' : session_id_token
-                    },
-                    dataType: 'json',
-                })
-                .done(function(response) {
-                    console.log("Get Recommendations: SUCCESS")
-                    if (typeof(Storage) !== "undefined") {
-                        localStorage.setItem("recommendations", JSON.stringify(response));
-                    } else {
-                        alert("Deepest apologies... Your web browser is not supported :(")
-                    }
+                    var jqxhr = $.ajax(
+                    { 
+                        url: url,
+                        method: 'GET',
+                        crossDomain: true,
+                        headers: {
+                            'Authorization' : session_id_token
+                        },
+                        dataType: 'json',
+                    })
+                    .done(function(response) {
+                        console.log("Get Recommendations: SUCCESS")
+                        if (typeof(Storage) !== "undefined") {
+                            localStorage.setItem("recommendations", JSON.stringify(response));
+                            localStorage.setItem("recommendations-timestamp", current_time);
+                        } else {
+                            alert("Deepest apologies... Your web browser is not supported :(")
+                        }
+                        initPage()
+                    })
+                    .fail(function(xhr) {
+                        console.log(xhr)
+                        alert( "ERROR: " + xhr );
+                    });
+                }
+                else
                     initPage()
-
-                })
-                .fail(function(xhr) {
-                    console.log(xhr)
-                    alert( "ERROR: " + xhr );
-                });
             }
 
             function getDetailsCallback(item)
@@ -286,7 +294,7 @@
                     '<p class="card-text">' + restaurant["google-rating"] + '</p>'
 
                 if (restaurant["spoon-feed-value"])
-                    item_div +=   '<p class="card-text">SFV: ' + restaurant["google-rating"] + '</p>'
+                    item_div +=   '<p class="card-text">SFV: ' + restaurant["spoon-feed-value"] + '</p>'
                     
                 item_div += '</div></div>'
                 
