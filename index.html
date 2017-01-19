@@ -14,10 +14,23 @@
         <script src="./javascript/amazon-cognito-identity.min.js"></script>
         <script src="https://sdk.amazonaws.com/js/aws-sdk-2.6.10.min.js"></script>
         <script src="./javascript/user-service.js"></script>
+        <script src="./javascript/geohash.js"></script>
         
         <style>
             #map {
                 height: 80%;
+            }
+            #loading {
+                height:75px;
+                width:75px;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+            #loading img {
+                width: 100%;
+                height: auto;
             }
             #item_scroll_bar {
                 height: 20%;
@@ -49,6 +62,7 @@
             var user_attributes = {};
             var dislike_value = 0;
             var like_value = 1;
+            var geohash_precision = 6;
             var cognito_user = userPool.getCurrentUser();
             var session_id_token;
 
@@ -80,7 +94,7 @@
                                 user_attributes[result[i].getName()] = user_id = result[i].getValue()
                             }
                             console.log(user_attributes)
-                            getRecommendations()
+                            initPage()
                         });
 
                         $( function() {
@@ -107,42 +121,54 @@
                 }
             }
 
-            function getRecommendations()
+            function getRecommendations(location)
             {
                 var recommendations_timeout = 60*60*1000;
                 var current_time = Date.now();
                 var last_recommendation_timestamp = localStorage.getItem("recommendations-timestamp")
-                if ( (current_time - last_recommendation_timestamp) > recommendations_timeout )
+                if ( true || (current_time - last_recommendation_timestamp) > recommendations_timeout )
                 {
+                    var geohash = encodeGeoHash(location.lat, location.lng, geohash_precision)
+                    var lower_limit_geohash = calculateAdjacent(calculateAdjacent(geohash, 'bottom'), 'left')
+                    var upper_limit_geohash = calculateAdjacent(calculateAdjacent(geohash, 'top'), 'right')
+                    console.log('Geohash: ' + geohash + ' lower_limit_geohash: ' + lower_limit_geohash + ' upper_limit_geohash ' + upper_limit_geohash)
                     var url = 'https://i5jasr6flc.execute-api.us-west-2.amazonaws.com/prod/duclos-app-restaurant/recommendations/' + user_attributes['sub']
 
                     var jqxhr = $.ajax(
                     { 
-                        url: url,
-                        method: 'GET',
-                        crossDomain: true,
-                        headers: {
+                        url : url,
+                        method : 'GET',
+                        crossDomain : true,
+                        data : {
+                            'skey_lower' : lower_limit_geohash,
+                            'skey_upper' : upper_limit_geohash
+                        },
+                        headers : {
                             'Authorization' : session_id_token
                         },
-                        dataType: 'json',
+                        dataType : 'json',
                     })
                     .done(function(response) {
                         console.log("Get Recommendations: SUCCESS")
+                        console.log(response)
                         if (typeof(Storage) !== "undefined") {
                             localStorage.setItem("recommendations", JSON.stringify(response));
                             localStorage.setItem("recommendations-timestamp", current_time);
-                        } else {
+                        } 
+                        else {
                             alert("Deepest apologies... Your web browser is not supported :(")
                         }
-                        initPage()
                     })
                     .fail(function(xhr) {
                         console.log(xhr)
                         alert( "ERROR: " + xhr );
+                    })
+                    .always(function(response){
+                        initMap(location)
                     });
                 }
                 else
-                    initPage()
+                    initMap(location)
             }
 
             function getDetailsCallback(item)
@@ -192,18 +218,17 @@
             }
 
             function initPage() {
-                var pos = {lat: -33.867, lng: 151.195};
+                var location = {lat: -33.867, lng: 151.195};
 
                 // Try HTML5 geolocation
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
-                        function(position) {
-                            pos = {
-                                lat: position.coords.latitude,
-                                lng: position.coords.longitude
+                        function(loc) {
+                            location = {
+                                lat: loc.coords.latitude,
+                                lng: loc.coords.longitude
                             };
-                            initMap(pos);
-
+                            getRecommendations(location);
                         }, 
                         function() {
                             handleLocationError(true);
@@ -212,23 +237,23 @@
                 } 
                 else {
                     // Browser doesn't support Geolocation
-                    initMap(pos)
+                    initMap(location)
                     handleLocationError(false);
                 }
             }
 
-            function initMap(pos) 
+            function initMap(location) 
             {
 
                 map = new google.maps.Map(document.getElementById('map'), {
-                    center: pos,
+                    center: location,
                     zoom: 15
                 });
 
                 infowindow = new google.maps.InfoWindow();
                 service = new google.maps.places.PlacesService(map);
                 service.nearbySearch({
-                    location: pos,
+                    location: location,
                     radius: 1000,
                     type: ['restaurant']
                 }, initMapCallback);
@@ -267,6 +292,7 @@
                         }
                         createMarker(restaurant);
                         createItemCards(restaurant);
+                        $("#loading").hide();
                     }
                 }
             }
@@ -308,6 +334,9 @@
         </script>
     </head>
     <body>
+        <div id="loading">
+            <img src="images/loading_spinner.gif" alt="Loading...">
+        </div>
         <div id="map"></div>
         <div id="item_scroll_bar"></div>
 
