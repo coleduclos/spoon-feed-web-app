@@ -188,7 +188,7 @@
                 
                 var jqxhr = $.ajax( 
                     { 
-                        url: "https://i5jasr6flc.execute-api.us-west-2.amazonaws.com/prod/duclos-app-rating",
+                        url: "https://5otx9241pj.execute-api.us-west-2.amazonaws.com/dev/rating",
                         method: 'POST',
                         crossDomain: true,
                         data: JSON.stringify({ 
@@ -229,6 +229,7 @@
                                 lng: loc.coords.longitude
                             };
                             getRecommendations(location);
+                            //initMap(location);
                         }, 
                         function() {
                             handleLocationError(true);
@@ -282,14 +283,18 @@
                     for (var i = 0; i < results.length; i++) 
                     {
                         restaurant = results[i]
-                        for (var j = 0; j < recommendations.length; j++)
+                        if (recommendations)
                         {
-                            if (restaurant["restaurant-id"] == recommendations[j]["restaurant-id"])
+                             for (var j = 0; j < recommendations.length; j++)
                             {
-                                $.extend(restaurant, recommendations[j])
-                            }
+                                if (restaurant["restaurant-id"] == recommendations[j]["restaurant-id"])
+                                {
+                                    $.extend(restaurant, recommendations[j])
+                                }
 
+                            }
                         }
+
                         createMarker(restaurant);
                         createItemCards(restaurant);
                         $("#loading").hide();

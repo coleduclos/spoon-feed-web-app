@@ -1,8 +1,8 @@
 // Initialize AWS Cognito
 var cognito_region = 'us-west-2'
-var cognito_user_pool_id = 'us-west-2_Er7fZiWGf'
-var cognito_user_pool_app_client_id = '7b57ejilk6v49oot20cck0cap2'
-var cognito_identity_pool_id = 'us-west-2:79ea3a8c-1c05-4345-88d5-f121c822d351'
+var cognito_user_pool_id = 'us-west-2_lup3QDmr6'
+var cognito_user_pool_app_client_id = '1rbhhntteg9jecjorrl7hrmarb'
+var cognito_identity_pool_id = 'us-west-2:e1e515f0-a2f7-4bbb-9524-92a2b7d71825'
 var cognito_login_key = 'cognito-idp.' + cognito_region + '.amazonaws.com/' + cognito_user_pool_id
 // Initialize the Amazon Cognito credentials provider
 AWS.config.credentials = new AWS.CognitoIdentityCredentials({
